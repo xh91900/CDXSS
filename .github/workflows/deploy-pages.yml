@@ -16,7 +16,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          # ❌删掉原来 cache: 'npm'，这里不能用自动cache
+
+      # 手动缓存，指向子项目目录
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ./convenience-store-simulator/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('./convenience-store-simulator/package-lock.json') }}
 
       - name: Enter project folder & install dependencies
         run: |
