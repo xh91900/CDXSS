@@ -4,6 +4,13 @@ on:
   push:
     branches: [ main ]
 
+# =========新增这一段权限声明=========
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+# ===================================
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
