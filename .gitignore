@@ -1,0 +1,29 @@
+# 项目子目录内的依赖
+convenience-store-simulator/node_modules/
+
+# webpack打包输出（你的dist在子项目里面）
+convenience-store-simulator/dist/
+
+# 环境变量密钥
+.env
+.env.local
+convenience-store-simulator/.env
+convenience-store-simulator/.env.local
+
+# IDE配置
+.vscode/
+.idea/
+convenience-store-simulator/.vscode/
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+
+# npm日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 操作系统临时文件
+*.swp
+*.swo
