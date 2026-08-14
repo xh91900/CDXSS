@@ -27,13 +27,20 @@ const defaults: Inputs = {
 
 const money = (n: number) => Number.isFinite(n) ? `¥${Math.round(n).toLocaleString("zh-CN")}` : "—";
 const integer = (n: number) => Number.isFinite(n) ? Math.round(n).toLocaleString("zh-CN") : "—";
+// 由开始/结束时间自动计算小时数；结束 ≤ 开始视为跨天班次（如 22:00→06:00 = 8h），结果保留 1 位小数
+const calcHours = (start: string, end: string) => {
+    const [sh, sm] = start.split(":").map(Number), [eh, em] = end.split(":").map(Number);
+    let m = eh * 60 + em - (sh * 60 + sm);
+    if (m <= 0) m += 24 * 60;
+    return Math.round(m / 6) / 10;
+};
 
 function App() {
-    const [i, setI] = React.useState<Inputs>(() => { try { return JSON.parse(localStorage.getItem("convenience-store-model-v03") || "null") || defaults } catch { return defaults } });
+    const [i, setI] = React.useState<Inputs>(() => { try { const saved = JSON.parse(localStorage.getItem("convenience-store-model-v03") || "null") || defaults; if (saved.shifts) saved.shifts = saved.shifts.map((s: Shift) => ({ ...s, hours: calcHours(s.start, s.end) })); return saved } catch { return defaults } });
     React.useEffect(() => localStorage.setItem("convenience-store-model-v03", JSON.stringify(i)), [i]);
     const update = <K extends keyof Inputs>(k: K, v: Inputs[K]) => setI(p => ({ ...p, [k]: v }));
-    const updateShift = (n: number, p: Partial<Shift>) => setI(x => ({ ...x, shifts: x.shifts.map((s, j) => j === n ? { ...s, ...p } : s) }));
-    const addShift = () => setI(x => ({ ...x, shifts: [...x.shifts, { start: "00:00", end: "00:00", hours: 1, staff: 1 }] }));
+    const updateShift = (n: number, p: Partial<Shift>) => setI(x => ({ ...x, shifts: x.shifts.map((s, j) => { if (j !== n) return s; const next = { ...s, ...p }; if (p.start !== undefined || p.end !== undefined) next.hours = calcHours(next.start, next.end); return next }) }));
+    const addShift = () => setI(x => ({ ...x, shifts: [...x.shifts, { start: "09:00", end: "18:00", hours: calcHours("09:00", "18:00"), staff: 1 }] }));
     const delShift = (n: number) => setI(x => ({ ...x, shifts: x.shifts.filter((_, j) => j !== n) }));
 
     const entries = i.passingTraffic * i.captureRate / 100, orders = entries * i.conversionRate / 100;
@@ -67,9 +74,9 @@ function App() {
                 <div className="funnel"><FunnelRow label="路过人流" value={`${integer(i.passingTraffic)} 人/天`} /><FunnelRow label={`× 捕获率 ${i.captureRate}%`} value={`${integer(entries)} 人进店/天`} /><FunnelRow label={`× 成交率 ${i.conversionRate}%`} value={`${integer(orders)} 单/天`} /><FunnelRow label={`× 客单价 ¥${i.avgTicket}`} value={money(salesDay)} /></div>
                 <div className="summary"><Row k="预计进店人数" v={`${integer(entries)} 人/天`} /><Row k="预计成交订单" v={`${integer(orders)} 单/天`} /><Row k="预计日销售" v={money(salesDay)} /><Row k="预计月销售" v={money(salesMonth)} /><Row k="预计月毛利" v={money(gross)} /></div>
             </div>
-            <div><h3>人工排班</h3><div className="hint">人工成本 = 人数 × 小时 × 时薪 × 每月营业天数。开始/结束时间用于记录班次，小时数可手动修正。</div>
+            <div><h3>人工排班</h3><div className="hint">人工成本 = 人数 × 小时 × 时薪 × 每月营业天数。小时数由开始/结束时间自动计算，跨天班次（如 22:00→06:00）自动按 8 小时折算。</div>
                 <div className="shift head"><span>开始</span><span>结束</span><span>小时</span><span>人数</span><span></span></div>
-                {i.shifts.map((s, n) => <div className="shift" key={n}><input type="time" value={s.start} onChange={e => updateShift(n, { start: e.target.value })} /><input type="time" value={s.end} onChange={e => updateShift(n, { end: e.target.value })} /><input type="number" min="0" step=".5" value={s.hours} onChange={e => updateShift(n, { hours: +e.target.value })} /><input type="number" min="1" max="10" value={s.staff} onChange={e => updateShift(n, { staff: +e.target.value })} /><button className="x" onClick={() => delShift(n)}>×</button></div>)}
+                {i.shifts.map((s, n) => <div className="shift" key={n}><input type="time" value={s.start} onChange={e => updateShift(n, { start: e.target.value })} /><input type="time" value={s.end} onChange={e => updateShift(n, { end: e.target.value })} /><b className="hours" title="自动按开始/结束时间计算">{s.hours}</b><input type="number" min="1" max="10" value={s.staff} onChange={e => updateShift(n, { staff: +e.target.value })} /><button className="x" onClick={() => delShift(n)}>×</button></div>)}
                 <button className="add" onClick={addShift}>＋ 添加排班</button>
                 <div className="summary"><Row k="员工需求工时" v={`${staffHoursDay * i.daysPerMonth} h/月`} /><Row k="员工时薪" v={`${money(i.staffHourly)}/h`} /><Row k="员工人工成本" v={`${money(staffCost)}/月`} danger={staffWarn} /><Row k="员工预算" v={`${money(i.staffBudget)}/月`} /></div>
                 {staffWarn && <div className="warning">⚠️ 当前排班超过员工人工预算 {money(staffCost - i.staffBudget)}，模型不会自动截断实际成本。</div>}
